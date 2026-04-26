@@ -3,14 +3,28 @@ from .models import CalendarEvent, Notification, ReportCard, Grade, Absence, Doc
 from accounts.serializers import UserSerializer
 
 class CalendarEventSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = CalendarEvent
         fields = '__all__'
 
+    def get_created_by_name(self, obj):
+        return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+
 class NotificationSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+    sender_role = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
         fields = '__all__'
+
+    def get_sender_name(self, obj):
+        return f"{obj.sender.first_name} {obj.sender.last_name}"
+
+    def get_sender_role(self, obj):
+        return obj.sender.role
 
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:

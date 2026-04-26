@@ -8,14 +8,13 @@ function StudentDashboard({ activeTab, demoUser }) {
   const [reportCards, setReportCards] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [documentRequests, setDocumentRequests] = useState([]);
-
-  // Form states
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('');
   const [justificationText, setJustificationText] = useState('');
   const [selectedAbsence, setSelectedAbsence] = useState(null);
   const [docType, setDocType] = useState('Scolarite');
 
   useEffect(() => {
-    // Fetch data
     api.get('/portal/calendar/').then(res => setCalendar(res.data));
     api.get('/portal/notifications/').then(res => setNotifications(res.data));
     api.get('/portal/report-cards/').then(res => setReportCards(res.data));
@@ -23,129 +22,9 @@ function StudentDashboard({ activeTab, demoUser }) {
     api.get('/portal/document-requests/').then(res => setDocumentRequests(res.data));
   }, []);
 
-  const handleDeleteNotification = (id) => {
-    api.delete(`/portal/notifications/${id}/`).then(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }).catch(() => {
-      // Optimistic delete on failure
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    });
-  };
-
-  const handleClearAllNotifications = () => {
-    setNotifications([]);
-  };
-
-  const handleJustifyAbsence = (e) => {
-    e.preventDefault();
-    if (!selectedAbsence) return;
-    
-    // In a real app, we'd patch the absence object
-    api.patch(`/portal/absences/${selectedAbsence}/`, {
-      justification_text: justificationText,
-      justification_status: 'Pending'
-    }).then(() => {
-      setJustificationText('');
-      setSelectedAbsence(null);
-      // Refresh absences
-      api.get('/portal/absences/').then(res => setAbsences(res.data));
-    });
-  };
-
-  const handleDocRequest = (e) => {
-    e.preventDefault();
-    if (!demoUser) return;
-
-    api.post('/portal/document-requests/', {
-      student: demoUser.id,
-      document_type: docType,
-      status: 'Pending'
-    }).then(() => {
-      api.get('/portal/document-requests/').then(res => setDocumentRequests(res.data));
-    });
-  };
-
-  const renderOverview = () => (
-    <div className="grid-cards">
-      <div className="glass-panel" style={{display: 'flex', gap: '1.5rem', alignItems: 'center'}}>
-        <div style={{width: '100px', height: '100px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nizar&mouth=smile,default&eyebrows=default&eyes=default" alt="Profile" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-        </div>
-        <div>
-          <h3 style={{marginBottom: '0.5rem'}}>Profile Info</h3>
-          {demoUser && demoUser.student_profile ? (
-            <div>
-              <p><strong>Name:</strong> {demoUser.first_name} {demoUser.last_name}</p>
-              <p><strong>Matricule:</strong> <span className="badge badge-info">{demoUser.matricule}</span></p>
-              <p><strong>Email:</strong> {demoUser.email}</p>
-              <p><strong>Major:</strong> {demoUser.student_profile.filiere}</p>
-              <p><strong>Year:</strong> {demoUser.student_profile.annee_etude}</p>
-              <p><strong>Tutor:</strong> {demoUser.student_profile.tutor_name}</p>
-            </div>
-          ) : <p>Loading profile...</p>}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderCalendar = () => {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    return (
-      <div className="glass-panel">
-        <h2>My Weekly Schedule</h2>
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginTop: '1.5rem'}}>
-          {days.map((day, idx) => (
-            <div key={day} style={{border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'rgba(0,0,0,0.2)'}}>
-              <h3 style={{borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', marginBottom: '1rem', textAlign: 'center'}}>{day}</h3>
-              {/* Simulate subjects filling the calendar */}
-              {idx === 0 && <div style={{padding: '0.5rem', background: 'rgba(79, 70, 229, 0.2)', marginBottom: '0.5rem', borderRadius: '4px'}}><strong>08:30 - 10:30</strong><br/>Algorithmique</div>}
-              {idx === 0 && <div style={{padding: '0.5rem', background: 'rgba(16, 185, 129, 0.2)', marginBottom: '0.5rem', borderRadius: '4px'}}><strong>10:45 - 12:45</strong><br/>Dev Web</div>}
-              {idx === 1 && <div style={{padding: '0.5rem', background: 'rgba(245, 158, 11, 0.2)', marginBottom: '0.5rem', borderRadius: '4px'}}><strong>08:30 - 12:45</strong><br/>Base de Données</div>}
-              {idx === 2 && <div style={{padding: '0.5rem', background: 'rgba(239, 68, 68, 0.2)', marginBottom: '0.5rem', borderRadius: '4px'}}><strong>14:00 - 18:00</strong><br/>Réseaux</div>}
-              {idx === 3 && <div style={{padding: '0.5rem', background: 'rgba(79, 70, 229, 0.2)', marginBottom: '0.5rem', borderRadius: '4px'}}><strong>08:30 - 10:30</strong><br/>Systèmes d'Exp.</div>}
-              {idx === 4 && <div style={{padding: '0.5rem', background: 'rgba(16, 185, 129, 0.2)', marginBottom: '0.5rem', borderRadius: '4px'}}><strong>10:45 - 12:45</strong><br/>Projet</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderNotifications = () => (
-    <div className="glass-panel">
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-        <h2>Notifications</h2>
-        {notifications.length > 0 && (
-          <button className="btn btn-secondary" onClick={handleClearAllNotifications}>Clear All</button>
-        )}
-      </div>
-      <div style={{marginTop: '1.5rem'}}>
-        {notifications.length === 0 ? <p>No new notifications.</p> : notifications.map(n => (
-          <div key={n.id} style={{padding: '1rem', borderBottom: '1px solid var(--border)'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-              <h4>{n.title}</h4>
-              <button 
-                onClick={() => handleDeleteNotification(n.id)}
-                style={{background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.2rem'}}
-                title="Delete"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-            <p style={{margin: '0.5rem 0'}}>{n.content}</p>
-            <small style={{color: 'var(--text-muted)'}}>{new Date(n.date_envoi).toLocaleString()}</small>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const [selectedYear, setSelectedYear] = useState('');
-  const [selectedSemester, setSelectedSemester] = useState('');
-
   useEffect(() => {
     if (reportCards.length > 0) {
-      const years = [...new Set(reportCards.map(rc => rc.academic_year))];
+      const years = [...new Set(reportCards.map(rc => rc.academic_year))].sort().reverse();
       if (!selectedYear) setSelectedYear(years[0]);
     }
   }, [reportCards]);
@@ -157,110 +36,307 @@ function StudentDashboard({ activeTab, demoUser }) {
     }
   }, [selectedYear, reportCards]);
 
-  const renderGrades = () => {
-    const years = [...new Set(reportCards.map(rc => rc.academic_year))];
-    const availableSemesters = reportCards.filter(rc => rc.academic_year === selectedYear).map(rc => rc.semester);
-    
-    const activeRc = reportCards.find(rc => rc.academic_year === selectedYear && rc.semester === selectedSemester);
+  const handleDeleteNotification = (id) => {
+    api.delete(`/portal/notifications/${id}/`).then(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }).catch(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    });
+  };
+
+  const handleClearAllNotifications = () => setNotifications([]);
+
+  const handleJustifyAbsence = (e) => {
+    e.preventDefault();
+    if (!selectedAbsence) return;
+    api.patch(`/portal/absences/${selectedAbsence}/`, {
+      justification_text: justificationText,
+      justification_status: 'Pending'
+    }).then(() => {
+      setJustificationText('');
+      setSelectedAbsence(null);
+      api.get('/portal/absences/').then(res => setAbsences(res.data));
+    });
+  };
+
+  const handleDocRequest = (e) => {
+    e.preventDefault();
+    if (!demoUser) return;
+    api.post('/portal/document-requests/', {
+      student: demoUser.id,
+      document_type: docType,
+      status: 'Pending'
+    }).then(() => {
+      api.get('/portal/document-requests/').then(res => setDocumentRequests(res.data));
+    });
+  };
+
+  const renderOverview = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div className="glass-panel">
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{
+            width: '120px', height: '120px', borderRadius: '50%',
+            backgroundColor: 'rgba(16,185,129,0.1)', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '3px solid rgba(16,185,129,0.3)', flexShrink: 0
+          }}>
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nizar&mouth=smile,default&eyebrows=default&eyes=default" alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <h2 style={{ marginBottom: '0.25rem' }}>
+              {demoUser ? `${demoUser.first_name} ${demoUser.last_name}` : 'Student Profile'}
+            </h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>Student</p>
+            {demoUser && demoUser.student_profile ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+                {[
+                  { label: 'Matricule', value: demoUser.matricule, highlight: true },
+                  { label: 'Email', value: demoUser.email },
+                  { label: 'Major', value: demoUser.student_profile.filiere },
+                  { label: 'Year', value: `Year ${demoUser.student_profile.annee_etude}` },
+                  { label: 'Tutor', value: demoUser.student_profile.tutor_name },
+                ].map(({ label, value, highlight }) => (
+                  <div key={label} style={{ padding: '0.875rem 1rem', background: 'var(--background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                    <p style={{ fontWeight: 600, color: highlight ? 'var(--primary)' : 'inherit' }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : <p>Loading profile...</p>}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+        <div className="glass-panel" style={{ textAlign: 'center', padding: '1.5rem' }}>
+          <p style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--danger)' }}>{absences.filter(a => !a.is_present).length}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>Absences</p>
+        </div>
+        <div className="glass-panel" style={{ textAlign: 'center', padding: '1.5rem' }}>
+          <p style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)' }}>{notifications.length}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>Notifications</p>
+        </div>
+        <div className="glass-panel" style={{ textAlign: 'center', padding: '1.5rem' }}>
+          <p style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--secondary)' }}>{documentRequests.length}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>Doc Requests</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCalendar = () => {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const dayColors = ['rgba(79,70,229,0.12)', 'rgba(245,158,11,0.12)', 'rgba(239,68,68,0.12)', 'rgba(16,185,129,0.12)', 'rgba(59,130,246,0.12)'];
+    const dayBorders = ['#4F46E5', '#F59E0B', '#EF4444', '#10B981', '#3B82F6'];
+    const fixedSchedule = [
+      [{ time: '08:30–10:30', name: 'Algorithmique' }, { time: '10:45–12:45', name: 'Dev Web' }],
+      [{ time: '08:30–12:45', name: 'Base de Données' }],
+      [{ time: '14:00–18:00', name: 'Réseaux' }],
+      [{ time: '08:30–10:30', name: "Systèmes d'Exp." }],
+      [{ time: '10:45–12:45', name: 'Projet' }],
+    ];
 
     return (
-    <div className="glass-panel">
-      <h2>Report Cards</h2>
-      
-      {reportCards.length > 0 ? (
-        <div style={{marginTop: '1.5rem'}}>
-          <div style={{display: 'flex', gap: '1rem', marginBottom: '1.5rem'}}>
-            <div className="input-group" style={{marginBottom: 0, flex: 1}}>
-              <label className="input-label">Year</label>
-              <select className="input-field" value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-            <div className="input-group" style={{marginBottom: 0, flex: 1}}>
-              <label className="input-label">Semester</label>
-              <select className="input-field" value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)}>
-                {availableSemesters.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="glass-panel">
+          <h2 style={{ marginBottom: '1.5rem' }}>📅 My Weekly Schedule</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
+            {days.map((day, idx) => (
+              <div key={day} style={{ border: `1px solid ${dayBorders[idx]}30`, borderTop: `3px solid ${dayBorders[idx]}`, borderRadius: 'var(--radius-md)', padding: '1rem', background: dayColors[idx], minHeight: '140px' }}>
+                <h4 style={{ textAlign: 'center', marginBottom: '1rem', color: dayBorders[idx], fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{day}</h4>
+                {fixedSchedule[idx].map((s, i) => (
+                  <div key={i} style={{ padding: '0.5rem', background: 'white', marginBottom: '0.5rem', borderRadius: '6px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: `3px solid ${dayBorders[idx]}` }}>
+                    <p style={{ fontSize: '0.7rem', fontWeight: 700, color: dayBorders[idx] }}>{s.time}</p>
+                    <p style={{ fontSize: '0.78rem', marginTop: '0.15rem' }}>{s.name}</p>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
-          
-          {activeRc ? (
-          <div style={{padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)'}}>
-            <p style={{marginBottom: '1rem'}}><strong>General Average:</strong> <span style={{color: activeRc.general_average >= 10 ? 'var(--success)' : 'var(--danger)'}}>{activeRc.general_average}</span></p>
-            
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>Type</th>
-                    <th>Grade</th>
-                    <th>Rattrapage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeRc.grades.map(g => (
-                    <tr key={g.id}>
-                      <td>{g.subject}</td>
-                      <td>{g.evaluation_type}</td>
-                      <td style={{color: g.value >= 10 ? 'var(--success)' : 'var(--danger)'}}>{g.value}</td>
-                      <td>{g.is_rattrapage ? <span className="badge badge-warning">Yes</span> : 'No'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          ) : <p>No data for this semester.</p>}
         </div>
-      ) : <p>No report cards available.</p>}
+
+        {/* Events added by teacher */}
+        <div className="glass-panel">
+          <h2 style={{ marginBottom: '1.5rem' }}>📋 Upcoming Events & Announcements</h2>
+          {calendar.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>No events scheduled.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {calendar.map(ev => (
+                <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: ev.event_type === 'Examen' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                    {ev.event_type === 'Examen' ? '📝' : ev.event_type === 'TD' ? '🔬' : '📚'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 600 }}>{ev.title}</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                      {ev.description} {ev.created_by_name && <span>· Added by {ev.created_by_name}</span>}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontSize: '0.8rem', fontWeight: 600 }}>{new Date(ev.start_time).toLocaleDateString('fr-FR', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(ev.start_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <span style={{ padding: '0.25rem 0.625rem', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 700, background: ev.event_type === 'Examen' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: ev.event_type === 'Examen' ? '#EF4444' : '#10B981', flexShrink: 0 }}>
+                    {ev.event_type}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderNotifications = () => (
+    <div className="glass-panel">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2>🔔 Notifications</h2>
+        {notifications.length > 0 && (
+          <button className="btn btn-secondary" onClick={handleClearAllNotifications}>Clear All</button>
+        )}
+      </div>
+      {notifications.length === 0 ? (
+        <p style={{ color: 'var(--text-muted)' }}>No new notifications.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {notifications.map(n => (
+            <div key={n.id} style={{ padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', borderLeft: '3px solid var(--primary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ marginBottom: '0.35rem' }}>{n.title}</h4>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{n.content}</p>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {n.sender_name && (
+                      <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: n.sender_role === 'teacher' ? 'rgba(79,70,229,0.1)' : 'rgba(59,130,246,0.1)', color: n.sender_role === 'teacher' ? '#4F46E5' : '#3B82F6', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
+                        {n.sender_role === 'teacher' ? '👨‍🏫' : '🏢'} {n.sender_name} · {n.sender_role === 'teacher' ? 'Teacher' : 'Administration'}
+                      </span>
+                    )}
+                    <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{new Date(n.date_envoi).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+                  </div>
+                </div>
+                <button onClick={() => handleDeleteNotification(n.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.2rem', flexShrink: 0 }} title="Delete">
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
+  );
+
+  const renderGrades = () => {
+    const years = [...new Set(reportCards.map(rc => rc.academic_year))].sort().reverse();
+    // All possible semesters
+    const allSemesters = ['S1', 'S2'];
+    const availableSemesters = reportCards.filter(rc => rc.academic_year === selectedYear).map(rc => rc.semester);
+    const activeRc = reportCards.find(rc => rc.academic_year === selectedYear && rc.semester === selectedSemester);
+    const isUnavailable = selectedSemester && !availableSemesters.includes(selectedSemester);
+
+    const handleSemesterChange = (sem) => {
+      const exists = reportCards.find(rc => rc.academic_year === selectedYear && rc.semester === sem);
+      if (!exists) {
+        // Throw a browser-style error
+        const msg = `No report card found for ${selectedYear} – ${sem}.\n\nThis semester was either not attended or records are unavailable.`;
+        window.alert(msg);
+        return;
+      }
+      setSelectedSemester(sem);
+    };
+
+    return (
+      <div className="glass-panel">
+        <h2 style={{ marginBottom: '1.5rem' }}>🎓 Report Cards</h2>
+        {reportCards.length > 0 ? (
+          <div>
+            {/* Year tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              {years.map(y => (
+                <button key={y} onClick={() => { setSelectedYear(y); setSelectedSemester(''); }}
+                  style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', background: selectedYear === y ? 'var(--primary)' : 'var(--background)', color: selectedYear === y ? 'white' : 'var(--text-main)', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', transition: 'all 0.2s' }}>
+                  {y}
+                </button>
+              ))}
+            </div>
+
+            {/* Semester tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              {allSemesters.map(s => {
+                const exists = reportCards.find(rc => rc.academic_year === selectedYear && rc.semester === s);
+                return (
+                  <button key={s} onClick={() => handleSemesterChange(s)}
+                    style={{ padding: '0.4rem 0.875rem', borderRadius: 'var(--radius-full)', border: `1px solid ${exists ? 'var(--primary)' : 'var(--border)'}`, background: selectedSemester === s ? 'var(--primary)' : exists ? 'rgba(16,185,129,0.08)' : 'var(--background)', color: selectedSemester === s ? 'white' : exists ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, opacity: exists ? 1 : 0.6, transition: 'all 0.2s' }}>
+                    {s} {!exists && '⚠️'}
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeRc ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: activeRc.general_average >= 10 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', border: `1px solid ${activeRc.general_average >= 10 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                  <div>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>General Average</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 700, color: activeRc.general_average >= 10 ? 'var(--success)' : 'var(--danger)' }}>{activeRc.general_average}<span style={{ fontSize: '1rem', fontWeight: 400 }}>/20</span></p>
+                  </div>
+                  <span style={{ marginLeft: 'auto', padding: '0.4rem 0.875rem', borderRadius: 'var(--radius-full)', background: activeRc.general_average >= 10 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', color: activeRc.general_average >= 10 ? 'var(--success)' : 'var(--danger)', fontWeight: 700, fontSize: '0.85rem' }}>
+                    {activeRc.general_average >= 10 ? '✓ Passed' : '✗ Failed'}
+                  </span>
+                </div>
+                <div className="table-container">
+                  <table>
+                    <thead><tr><th>Subject</th><th>Type</th><th>Grade</th><th>Rattrapage</th></tr></thead>
+                    <tbody>
+                      {activeRc.grades.map(g => (
+                        <tr key={g.id}>
+                          <td>{g.subject}</td>
+                          <td>{g.evaluation_type}</td>
+                          <td style={{ color: g.value >= 10 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>{g.value}/20</td>
+                          <td>{g.is_rattrapage ? <span className="badge badge-warning">Yes</span> : 'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              !isUnavailable && <p style={{ color: 'var(--text-muted)' }}>Select a semester to view grades.</p>
+            )}
+          </div>
+        ) : <p>No report cards available.</p>}
+      </div>
     );
   };
 
   const renderAbsences = () => (
     <div className="glass-panel">
-      <h2>Absences</h2>
-      <div className="table-container" style={{marginTop: '1.5rem'}}>
+      <h2 style={{ marginBottom: '1.5rem' }}>📋 Absences</h2>
+      <div className="table-container">
         <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Subject</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Date</th><th>Subject</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
             {absences.filter(a => !a.is_present).map(a => (
               <tr key={a.id}>
                 <td>{a.date_seance}</td>
                 <td>{a.subject}</td>
-                <td>
-                  <span className={`badge ${a.justification_status === 'Validated' ? 'badge-success' : a.justification_status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>
-                    {a.justification_status}
-                  </span>
-                </td>
-                <td>
-                  {!a.justification_text && (
-                    <button className="btn btn-secondary" style={{padding: '0.2rem 0.5rem', fontSize: '0.75rem'}} onClick={() => setSelectedAbsence(a.id)}>Justify</button>
-                  )}
-                </td>
+                <td><span className={`badge ${a.justification_status === 'Validated' ? 'badge-success' : a.justification_status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>{a.justification_status}</span></td>
+                <td>{!a.justification_text && <button className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setSelectedAbsence(a.id)}>Justify</button>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
       {selectedAbsence && (
-        <form onSubmit={handleJustifyAbsence} style={{marginTop: '2rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)'}}>
-          <h4>Submit Justification</h4>
-          <div className="input-group" style={{marginTop: '1rem'}}>
+        <form onSubmit={handleJustifyAbsence} style={{ marginTop: '2rem', padding: '1rem', background: 'var(--background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+          <h4 style={{ marginBottom: '1rem' }}>Submit Justification</h4>
+          <div className="input-group">
             <label className="input-label">Reason / Notes</label>
             <textarea className="input-field" value={justificationText} onChange={e => setJustificationText(e.target.value)} required rows={3}></textarea>
           </div>
-          <button type="submit" className="btn btn-primary">Submit Justification</button>
-          <button type="button" className="btn btn-secondary" style={{marginLeft: '0.5rem'}} onClick={() => setSelectedAbsence(null)}>Cancel</button>
+          <button type="submit" className="btn btn-primary">Submit</button>
+          <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => setSelectedAbsence(null)}>Cancel</button>
         </form>
       )}
     </div>
@@ -269,8 +345,8 @@ function StudentDashboard({ activeTab, demoUser }) {
   const renderDocuments = () => (
     <div className="grid-cards">
       <div className="glass-panel">
-        <h2>Request Document</h2>
-        <form onSubmit={handleDocRequest} style={{marginTop: '1.5rem'}}>
+        <h2 style={{ marginBottom: '1.5rem' }}>📄 Request Document</h2>
+        <form onSubmit={handleDocRequest}>
           <div className="input-group">
             <label className="input-label">Document Type</label>
             <select className="input-field" value={docType} onChange={e => setDocType(e.target.value)}>
@@ -281,32 +357,22 @@ function StudentDashboard({ activeTab, demoUser }) {
           <button type="submit" className="btn btn-primary">Submit Request</button>
         </form>
       </div>
-
       <div className="glass-panel">
-        <h2>My Requests</h2>
-        <div style={{marginTop: '1.5rem'}}>
-          {documentRequests.map(req => (
-            <div key={req.id} style={{display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: '1px solid var(--border)'}}>
-              <div>
-                <strong>{req.document_type === 'Scolarite' ? 'Attestation de Scolarité' : 'Attestation de Réussite'}</strong>
-                <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>{new Date(req.created_at).toLocaleDateString()}</p>
-              </div>
-              <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem'}}>
-                <span className={`badge ${req.status === 'Validated' ? 'badge-success' : req.status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>
-                  {req.status}
-                </span>
-                {req.status === 'Validated' && (
-                  <button className="btn btn-secondary" style={{padding: '0.2rem 0.5rem', fontSize: '0.75rem'}}>Download PDF</button>
-                )}
-              </div>
+        <h2 style={{ marginBottom: '1.5rem' }}>📁 My Requests</h2>
+        {documentRequests.map(req => (
+          <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <strong>{req.document_type === 'Scolarite' ? 'Attestation de Scolarité' : 'Attestation de Réussite'}</strong>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(req.created_at).toLocaleDateString()}</p>
             </div>
-          ))}
-        </div>
+            <span className={`badge ${req.status === 'Validated' ? 'badge-success' : req.status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>{req.status}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
 
-  switch(activeTab) {
+  switch (activeTab) {
     case 'calendar': return renderCalendar();
     case 'notifications': return renderNotifications();
     case 'grades': return renderGrades();
