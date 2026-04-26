@@ -6,6 +6,11 @@ function AdminDashboard({ activeTab, demoUser }) {
   const [absences, setAbsences] = useState([]);
   const [documentRequests, setDocumentRequests] = useState([]);
   const [students, setStudents] = useState([]);
+  const [calendar, setCalendar] = useState([]);
+  
+  // Calendar Edit State
+  const [editingEvent, setEditingEvent] = useState(null);
+  
   const [newNotif, setNewNotif] = useState({ title: '', content: '' });
   const [notifSuccess, setNotifSuccess] = useState(false);
 
@@ -16,6 +21,7 @@ function AdminDashboard({ activeTab, demoUser }) {
     api.get('/portal/absences/').then(res => setAbsences(res.data));
     api.get('/portal/document-requests/').then(res => setDocumentRequests(res.data));
     api.get('/accounts/users/').then(res => setStudents(res.data.filter(u => u.role === 'student')));
+    api.get('/portal/calendar/').then(res => setCalendar(res.data));
   };
 
   const handleSendNotif = (e) => {
@@ -49,12 +55,34 @@ function AdminDashboard({ activeTab, demoUser }) {
     api.patch(endpoint, payload).then(() => fetchData());
   };
 
+  const handleDeleteEvent = (id) => {
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      api.delete(`/portal/calendar/${id}/`).then(() => fetchData());
+    }
+  };
+
+  const handleUpdateEvent = (e) => {
+    e.preventDefault();
+    api.patch(`/portal/calendar/${editingEvent.id}/`, editingEvent).then(() => {
+      setEditingEvent(null);
+      fetchData();
+    });
+  };
+
   const renderOverview = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-panel">
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ width: '120px', height: '120px', borderRadius: '50%', backgroundColor: 'rgba(16,185,129,0.1)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid rgba(16,185,129,0.3)', flexShrink: 0 }}>
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Amjad&style=circle&mouth=smile,default&eyebrows=default&eyes=default" alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img 
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${demoUser?.first_name || 'Admin'}&top=${demoUser?.gender === 'F' ? 'longHair,bob,curly' : 'shortFlat,shortRound,sides'}&mouth=smile&eyebrows=default&eyes=default`} 
+              alt="Profile" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${demoUser?.first_name || 'A'}&backgroundColor=10B981&color=ffffff`;
+              }}
+            />
           </div>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <h2 style={{ marginBottom: '0.25rem' }}>
@@ -99,52 +127,75 @@ function AdminDashboard({ activeTab, demoUser }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div className="glass-panel">
           <h2 style={{ marginBottom: '0.5rem' }}>📢 Global Announcement</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-            Broadcast to all {students.length} enrolled student(s).
-          </p>
-          {notifSuccess && (
-            <div style={{ padding: '0.875rem', background: 'rgba(16,185,129,0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16,185,129,0.3)', marginBottom: '1rem', color: 'var(--primary)', fontWeight: 500 }}>
-              ✅ Announcement sent to {students.length} student(s) successfully!
-            </div>
-          )}
+          {notifSuccess && <div style={{ padding: '0.875rem', background: 'rgba(16,185,129,0.1)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', color: 'var(--primary)' }}>✅ Announcement sent!</div>}
           <form onSubmit={handleSendNotif}>
-            <div className="input-group">
-              <label className="input-label">Title</label>
-              <input type="text" className="input-field" placeholder="e.g. Fermeture exceptionnelle" value={newNotif.title} onChange={e => setNewNotif({ ...newNotif, title: e.target.value })} required />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Content</label>
-              <textarea className="input-field" rows={4} placeholder="Write your announcement here..." value={newNotif.content} onChange={e => setNewNotif({ ...newNotif, content: e.target.value })} required></textarea>
-            </div>
+            <div className="input-group"><label className="input-label">Title</label><input type="text" className="input-field" value={newNotif.title} onChange={e => setNewNotif({ ...newNotif, title: e.target.value })} required /></div>
+            <div className="input-group"><label className="input-label">Content</label><textarea className="input-field" rows={4} value={newNotif.content} onChange={e => setNewNotif({ ...newNotif, content: e.target.value })} required></textarea></div>
             <button type="submit" className="btn btn-primary">🔔 Broadcast to All Students</button>
           </form>
         </div>
-
         <div className="glass-panel">
-          <h2 style={{ marginBottom: '1.5rem' }}>📬 Sent Announcements</h2>
-          {sentByMe.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>No announcements sent yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {sentByMe.map(n => (
-                <div key={n.id} style={{ padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', borderLeft: '3px solid var(--secondary)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div>
-                      <h4 style={{ marginBottom: '0.35rem' }}>{n.title}</h4>
-                      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{n.content}</p>
-                    </div>
-                    <small style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
-                      {new Date(n.date_envoi).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </small>
-                  </div>
-                </div>
-              ))}
+          <h2>📬 Sent Announcements</h2>
+          {sentByMe.map(n => (
+            <div key={n.id} style={{ padding: '1rem', borderBottom: '1px solid var(--border)' }}>
+              <h4>{n.title}</h4>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{n.content}</p>
+              <small>{new Date(n.date_envoi).toLocaleString()}</small>
             </div>
-          )}
+          ))}
         </div>
       </div>
     );
   };
+
+  const renderCalendar = () => (
+    <div className="glass-panel">
+      <h2 style={{ marginBottom: '1.5rem' }}>📅 Global Calendar Management</h2>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>As an Administrator, you can modify or delete any event scheduled by teachers.</p>
+      
+      {editingEvent ? (
+        <div style={{ padding: '1.5rem', background: 'var(--background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary)', marginBottom: '2rem' }}>
+          <h3>Edit Event</h3>
+          <form onSubmit={handleUpdateEvent} style={{ marginTop: '1rem' }}>
+            <div className="input-group"><label className="input-label">Title</label><input type="text" className="input-field" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} /></div>
+            <div className="input-group"><label className="input-label">Description</label><input type="text" className="input-field" value={editingEvent.description} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="input-group"><label className="input-label">Start</label><input type="datetime-local" className="input-field" value={editingEvent.start_time.slice(0, 16)} onChange={e => setEditingEvent({...editingEvent, start_time: e.target.value})} /></div>
+              <div className="input-group"><label className="input-label">End</label><input type="datetime-local" className="input-field" value={editingEvent.end_time.slice(0, 16)} onChange={e => setEditingEvent({...editingEvent, end_time: e.target.value})} /></div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button type="submit" className="btn btn-primary">Update Event</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setEditingEvent(null)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr><th>Title</th><th>Type</th><th>Start</th><th>Added By</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {calendar.map(ev => (
+              <tr key={ev.id}>
+                <td><strong>{ev.title}</strong><br/><small style={{color:'var(--text-muted)'}}>{ev.description}</small></td>
+                <td><span className="badge badge-info">{ev.event_type}</span></td>
+                <td>{new Date(ev.start_time).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                <td>{ev.created_by_name}</td>
+                <td>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setEditingEvent(ev)}>Edit</button>
+                    <button className="btn btn-danger" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => handleDeleteEvent(ev.id)}>Delete</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   const renderStudents = () => (
     <div className="glass-panel">
@@ -183,7 +234,6 @@ function AdminDashboard({ activeTab, demoUser }) {
             </div>
           </div>
         ))}
-        {absences.filter(a => a.justification_status === 'Pending' && a.justification_text).length === 0 && <p style={{ color: 'var(--text-muted)' }}>No pending justifications.</p>}
       </div>
       <div className="glass-panel">
         <h2 style={{ marginBottom: '1.5rem' }}>📄 Document Requests</h2>
@@ -191,19 +241,18 @@ function AdminDashboard({ activeTab, demoUser }) {
           <div key={req.id} style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
             <p><strong>Student:</strong> {req.student_details?.first_name} {req.student_details?.last_name}</p>
             <p><strong>Document:</strong> {req.document_type === 'Scolarite' ? 'Attestation de Scolarité' : 'Attestation de Réussite'}</p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Requested on {new Date(req.created_at).toLocaleDateString()}</p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button className="btn btn-success" style={{ padding: '0.3rem 0.6rem' }} onClick={() => handleValidation('document', req.id, 'Validated')}>Approve & Generate</button>
+              <button className="btn btn-success" style={{ padding: '0.3rem 0.6rem' }} onClick={() => handleValidation('document', req.id, 'Validated')}>Approve</button>
               <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem' }} onClick={() => handleValidation('document', req.id, 'Rejected')}>Reject</button>
             </div>
           </div>
         ))}
-        {documentRequests.filter(r => r.status === 'Pending').length === 0 && <p style={{ color: 'var(--text-muted)' }}>No pending requests.</p>}
       </div>
     </div>
   );
 
   switch (activeTab) {
+    case 'calendar': return renderCalendar();
     case 'notifications': return renderNotifications();
     case 'students': return renderStudents();
     case 'validations': return renderValidations();

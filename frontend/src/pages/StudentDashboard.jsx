@@ -81,7 +81,15 @@ function StudentDashboard({ activeTab, demoUser }) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: '3px solid rgba(16,185,129,0.3)', flexShrink: 0
           }}>
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nizar&mouth=smile,default&eyebrows=default&eyes=default" alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img 
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${demoUser?.first_name || 'Student'}&top=${demoUser?.gender === 'F' ? 'longHair,bob,curly' : 'shortFlat,shortRound,sides'}&mouth=smile&eyebrows=default&eyes=default`} 
+              alt="Profile" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${demoUser?.first_name || 'S'}&backgroundColor=10B981&color=ffffff`;
+              }}
+            />
           </div>
           <div style={{ flex: 1, minWidth: '200px' }}>
             <h2 style={{ marginBottom: '0.25rem' }}>

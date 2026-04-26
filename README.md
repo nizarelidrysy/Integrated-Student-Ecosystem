@@ -43,3 +43,7 @@ The frontend will be available at `http://localhost:5173`.
 - Axios
 - Lucide React
 - Django REST Framework
+
+<div align="center">
+  <p>Built with ❤️ by Nizar EL IDRYSY - Hajar CHABLI - Nizar BTIRA - Owais BAKKALI - Amjad AHRRAR - 3IIRG3.</p>
+</div>

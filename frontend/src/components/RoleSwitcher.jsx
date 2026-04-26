@@ -5,10 +5,10 @@ function RoleSwitcher({ currentRole, setRole }) {
   return (
     <div className="demo-topbar">
       <div className="demo-brand">
-        <img src={logo} alt="EMSIGHT Logo" style={{ height: '44px', marginRight: '0.5rem' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-          <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '0.5px', color: 'var(--text-main)' }}>EMSIGHT</span>
-          <span style={{ fontWeight: 400, fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>Student Portal</span>
+        <img src={logo} alt="EMSIGHT Logo" style={{ height: '64px', marginRight: '0.75rem' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+          <span style={{ fontWeight: 800, fontSize: '1.5rem', letterSpacing: '0.2px', color: 'var(--text-main)' }}>EMSIGHT</span>
+          <span style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-muted)', letterSpacing: '0.4px' }}>STUDENT PORTAL</span>
         </div>
       </div>
       <div className="role-switcher">

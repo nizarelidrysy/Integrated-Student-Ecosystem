@@ -17,24 +17,91 @@ Absence.objects.all().delete()
 ReportCard.objects.all().delete()
 DocumentRequest.objects.all().delete()
 
-# Create Users
-student = CustomUser.objects.create_user(username='student_nizar', email='nizar@emsi.ma', password='password123', first_name='Nizar', last_name='El Idrysy', role='student', matricule='S-2022-123456')
-StudentProfile.objects.create(user=student, filiere='Ingénierie Informatique', annee_etude=4, numero_etudiant='E123456', tutor_name='Dr. Alami')
+# Create Users — last names UPPERCASE, correct email formats, gender added
+student = CustomUser.objects.create_user(
+    username='student_nizar',
+    email='nizar.elidrysy@emsi-edu.ma',
+    password='password123',
+    first_name='Nizar',
+    last_name='EL IDRYSY',
+    role='student',
+    matricule='S-2022-123456',
+    gender='M'
+)
 
-teacher = CustomUser.objects.create_user(username='teacher_hajar', email='hajar@emsi.ma', password='password123', first_name='Hajar', last_name='Chabli', role='teacher', matricule='T-2020-654321')
+teacher = CustomUser.objects.create_user(
+    username='teacher_hajar',
+    email='hajar.chabli@emsi.ma',
+    password='password123',
+    first_name='Hajar',
+    last_name='CHABLI',
+    role='teacher',
+    matricule='T-2020-654321',
+    gender='F'
+)
 TeacherProfile.objects.create(user=teacher, departement='Informatique', matiere='Développement Web')
 
-admin = CustomUser.objects.create_user(username='admin_amjad', email='amjad@emsi.ma', password='password123', first_name='Amjad', last_name='Ahrrar', role='admin', matricule='D-2018-987654')
+# Link Nizar to Hajar as tutor
+StudentProfile.objects.create(
+    user=student,
+    filiere='Ingénierie Informatique',
+    annee_etude=4,
+    numero_etudiant='E123456',
+    tutor_name='Hajar CHABLI'   # matches the actual teacher
+)
+
+admin = CustomUser.objects.create_user(
+    username='admin_amjad',
+    email='amjad.ahrrar@emsi.ma',
+    password='password123',
+    first_name='Amjad',
+    last_name='AHRRAR',
+    role='admin',
+    matricule='D-2018-987654',
+    gender='M'
+)
 AdminProfile.objects.create(user=admin, service='Scolarité')
 
-# Create Calendar Events (teacher-created events visible to students)
+# Add more users to test gender-suit avatars and matching tutors
+student2 = CustomUser.objects.create_user(
+    username='student_hajar2',
+    email='hajar.benani@emsi-edu.ma',
+    password='password123',
+    first_name='Hajar',
+    last_name='BENANI',
+    role='student',
+    matricule='S-2023-000001',
+    gender='F'
+)
+StudentProfile.objects.create(
+    user=student2,
+    filiere='Ingénierie Informatique',
+    annee_etude=3,
+    numero_etudiant='E222333',
+    tutor_name='Amjad AHRRAR' # Hack: using admin name as tutor for variety, but usually it's teachers. 
+    # Let's add another teacher.
+)
+
+teacher2 = CustomUser.objects.create_user(
+    username='teacher_amjad',
+    email='amjad.alami@emsi.ma',
+    password='password123',
+    first_name='Amjad',
+    last_name='ALAMI',
+    role='teacher',
+    matricule='T-2021-999888',
+    gender='M'
+)
+TeacherProfile.objects.create(user=teacher2, departement='Informatique', matiere='Base de Données')
+
+# Calendar Events
 now = timezone.now()
 e1 = CalendarEvent.objects.create(title='Cours de Dev Web', description='React et Django REST Framework - Chapitre 4', start_time=now + timedelta(days=1, hours=10), end_time=now + timedelta(days=1, hours=12), event_type='Cours', created_by=teacher)
 e2 = CalendarEvent.objects.create(title='Examen Final - Algorithmique', description='Salle 102 - Révision requise', start_time=now + timedelta(days=5, hours=9), end_time=now + timedelta(days=5, hours=11), event_type='Examen', created_by=teacher)
 e3 = CalendarEvent.objects.create(title='TD Base de Données', description='TP 3 - Optimisation des requêtes', start_time=now + timedelta(days=3, hours=14), end_time=now + timedelta(days=3, hours=16), event_type='TD', created_by=teacher)
-e4 = CalendarEvent.objects.create(title='Conférence Innovation', description='Amphithéâtre A - Intervenants externes', start_time=now + timedelta(days=7, hours=10), end_time=now + timedelta(days=7, hours=13), event_type='Cours', created_by=admin)
+e4 = CalendarEvent.objects.create(title='Conférence Innovation IA', description='Amphithéâtre A - Intervenants externes', start_time=now + timedelta(days=7, hours=10), end_time=now + timedelta(days=7, hours=13), event_type='Cours', created_by=admin)
 
-# Create Notifications
+# Notifications
 notif1 = Notification.objects.create(title='Rappel de Cours', content='Le cours de Dev Web est maintenu demain en salle 301. Préparez vos questions!', type_notif='Info', sender=teacher)
 notif1.recipients.add(student)
 
@@ -44,46 +111,31 @@ notif2.recipients.add(student)
 notif3 = Notification.objects.create(title='Résultats Examen S1', content='Les résultats du semestre 1 sont maintenant disponibles dans votre espace portail.', type_notif='Info', sender=admin)
 notif3.recipients.add(student)
 
-# Create Report Cards - Multiple Years
-# 2025-2026 S1
+# Report Cards — multiple years
 report_2526_s1 = ReportCard.objects.create(student=student, academic_year='2025-2026', semester='S1', general_average=15.5)
 Grade.objects.create(report_card=report_2526_s1, subject='Algorithmique', evaluation_type='Examen', value=16)
-Grade.objects.create(report_card=report_2526_s1, subject='Base de données', evaluation_type='Controle', value=14, is_rattrapage=False)
+Grade.objects.create(report_card=report_2526_s1, subject='Base de données', evaluation_type='Controle', value=14)
 Grade.objects.create(report_card=report_2526_s1, subject='Réseaux', evaluation_type='Examen', value=9, is_rattrapage=True)
 Grade.objects.create(report_card=report_2526_s1, subject='Développement Web', evaluation_type='Controle', value=18)
-Grade.objects.create(report_card=report_2526_s1, subject='Systèmes d\'Exploitation', evaluation_type='Examen', value=12)
+Grade.objects.create(report_card=report_2526_s1, subject="Systèmes d'Exploitation", evaluation_type='Examen', value=12)
 
-# 2024-2025 S1
 report_2425_s1 = ReportCard.objects.create(student=student, academic_year='2024-2025', semester='S1', general_average=13.8)
 Grade.objects.create(report_card=report_2425_s1, subject='Mathématiques', evaluation_type='Examen', value=13)
 Grade.objects.create(report_card=report_2425_s1, subject='Physique', evaluation_type='Examen', value=10)
 Grade.objects.create(report_card=report_2425_s1, subject='Programmation C', evaluation_type='Controle', value=17)
 Grade.objects.create(report_card=report_2425_s1, subject='Architecture', evaluation_type='Examen', value=11)
 
-# 2024-2025 S2
 report_2425_s2 = ReportCard.objects.create(student=student, academic_year='2024-2025', semester='S2', general_average=14.2)
 Grade.objects.create(report_card=report_2425_s2, subject='Algo Avancé', evaluation_type='Examen', value=15)
 Grade.objects.create(report_card=report_2425_s2, subject='POO Java', evaluation_type='Controle', value=14)
 Grade.objects.create(report_card=report_2425_s2, subject='Systèmes', evaluation_type='Examen', value=12)
 Grade.objects.create(report_card=report_2425_s2, subject='Réseaux I', evaluation_type='Controle', value=16)
 
-# 2023-2024 S1
-report_2324_s1 = ReportCard.objects.create(student=student, academic_year='2023-2024', semester='S1', general_average=12.7)
-Grade.objects.create(report_card=report_2324_s1, subject='Calcul Intégral', evaluation_type='Examen', value=11)
-Grade.objects.create(report_card=report_2324_s1, subject='Logique', evaluation_type='Examen', value=13)
-Grade.objects.create(report_card=report_2324_s1, subject='Intro Programmation', evaluation_type='Controle', value=15)
-
-# 2023-2024 S2
-report_2324_s2 = ReportCard.objects.create(student=student, academic_year='2023-2024', semester='S2', general_average=13.1)
-Grade.objects.create(report_card=report_2324_s2, subject='Analyse', evaluation_type='Examen', value=12)
-Grade.objects.create(report_card=report_2324_s2, subject='Electricité', evaluation_type='Examen', value=9, is_rattrapage=True)
-Grade.objects.create(report_card=report_2324_s2, subject='Programmation', evaluation_type='Controle', value=16)
-
-# Create Absences
+# Absences
 Absence.objects.create(student=student, teacher=teacher, subject='Développement Web', date_seance=now.date() - timedelta(days=2), is_present=False, justification_status='Pending')
 Absence.objects.create(student=student, teacher=teacher, subject='Développement Web', date_seance=now.date() - timedelta(days=7), is_present=False, justification_text='Certificat médical', justification_status='Validated')
 
-# Create Document Requests
+# Document Requests
 DocumentRequest.objects.create(student=student, document_type='Scolarite', status='Pending')
 
 print("✅ Database successfully populated with demo data!")

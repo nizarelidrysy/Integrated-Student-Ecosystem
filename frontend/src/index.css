@@ -208,7 +208,7 @@ select.input-field {
 .app-container {
   display: flex;
   min-height: 100vh;
-  padding-top: 72px; /* Space for the top demo bar */
+  padding-top: 88px; /* Space for the top demo bar */
 }
 
 .sidebar {
@@ -218,7 +218,7 @@ select.input-field {
   display: flex;
   flex-direction: column;
   position: fixed;
-  top: 72px;
+  top: 88px;
   bottom: 0;
   left: 0;
   z-index: 40;
@@ -266,7 +266,7 @@ select.input-field {
   top: 0;
   left: 0;
   right: 0;
-  height: 72px;
+  height: 88px;
   background: #FFFFFF;
   border-bottom: 1px solid var(--border);
   display: flex;

@@ -33,6 +33,7 @@ class GradeSerializer(serializers.ModelSerializer):
 
 class ReportCardSerializer(serializers.ModelSerializer):
     grades = GradeSerializer(many=True, read_only=True)
+    student_details = UserSerializer(source='student', read_only=True)
     
     class Meta:
         model = ReportCard
