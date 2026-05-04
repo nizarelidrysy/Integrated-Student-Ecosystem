@@ -1,8 +1,26 @@
 import React from 'react';
 import { Calendar, Bell, FileText, UserCheck, ShieldAlert, GraduationCap, LayoutDashboard, FileArchive } from 'lucide-react';
 
-function Sidebar({ currentRole, activeTab, setActiveTab }) {
+function Sidebar({ currentRole, currentPlatform, activeTab, setActiveTab }) {
   const getNavItems = () => {
+    if (currentPlatform === 'community') {
+      if (currentRole === 'admin') {
+        return [
+          { id: 'profile', label: 'Profile', icon: <UserCheck className="nav-icon" /> },
+          { id: 'announcements', label: 'Announcements', icon: <Bell className="nav-icon" /> },
+          { id: 'directory', label: 'Users Directory', icon: <GraduationCap className="nav-icon" /> },
+        ];
+      }
+      return [
+        { id: 'profile', label: 'Profile', icon: <UserCheck className="nav-icon" /> },
+        { id: 'offers', label: 'Offers', icon: <LayoutDashboard className="nav-icon" /> },
+        { id: 'materials', label: 'Materials', icon: <FileText className="nav-icon" /> },
+        { id: 'announcements', label: 'Announcements', icon: <Bell className="nav-icon" /> },
+        { id: 'cv_analyzer', label: 'CV Analyzer', icon: <FileArchive className="nav-icon" /> },
+      ];
+    }
+
+    // Default portal items
     switch(currentRole) {
       case 'student':
         return [
@@ -35,12 +53,13 @@ function Sidebar({ currentRole, activeTab, setActiveTab }) {
 
   const navItems = getNavItems();
   const userName = currentRole === 'student' ? 'Nizar EL IDRYSY' : currentRole === 'teacher' ? 'Hajar CHABLI' : 'Amjad AHRRAR';
+  const platformLabel = currentPlatform === 'community' ? 'Community' : 'Student Portal';
 
   return (
     <div className="sidebar">
       <div style={{padding: '2rem 1.5rem', borderBottom: '1px solid var(--border)', marginBottom: '1rem'}}>
         <div style={{fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.4rem'}}>
-          {currentRole} Dashboard
+          {currentRole} · {platformLabel}
         </div>
         <div style={{fontWeight: 600, fontSize: '1rem'}}>
           {userName}
@@ -68,9 +87,9 @@ function Sidebar({ currentRole, activeTab, setActiveTab }) {
         color: 'var(--text-muted)',
         lineHeight: 1.6,
       }}>
-        <p style={{ fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-main)' }}>PFA EMSIGHT</p>
+        <p style={{ fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-main)' }}>PFA <span style={{fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-main)' }}>EMSIGHT</span></p>
         <p style={{ marginBottom: '0.5rem' }}>
-          Made by : Nizar EL IDRYSY, Nizar BTIRA,<br />
+          Made by : <a href="https://www.linkedin.com/in/nizarelidrysy/" target="_blank" rel="noopener noreferrer">Nizar EL IDRYSY</a>, Nizar BTIRA,<br />
           Amjad AHRRAR, Hajar CHABLI,<br />
           Owais BAKKALI.
         </p>

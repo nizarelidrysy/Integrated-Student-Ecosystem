@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import api from '../api';
+import AvatarDisplay from '../components/AvatarDisplay';
 
 function StudentDashboard({ activeTab, demoUser }) {
   const [calendar, setCalendar] = useState([]);
@@ -75,22 +76,7 @@ function StudentDashboard({ activeTab, demoUser }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-panel">
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{
-            width: '120px', height: '120px', borderRadius: '50%',
-            backgroundColor: 'rgba(16,185,129,0.1)', overflow: 'hidden',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '3px solid rgba(16,185,129,0.3)', flexShrink: 0
-          }}>
-            <img 
-              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${demoUser?.first_name || 'Student'}&top=${demoUser?.gender === 'F' ? 'longHair,bob,curly' : 'shortFlat,shortRound,sides'}&mouth=smile&eyebrows=default&eyes=default`} 
-              alt="Profile" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${demoUser?.first_name || 'S'}&backgroundColor=10B981&color=ffffff`;
-              }}
-            />
-          </div>
+          <AvatarDisplay demoUser={demoUser} size={120} />
           <div style={{ flex: 1, minWidth: '200px' }}>
             <h2 style={{ marginBottom: '0.25rem' }}>
               {demoUser ? `${demoUser.first_name} ${demoUser.last_name}` : 'Student Profile'}

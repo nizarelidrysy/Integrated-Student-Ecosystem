@@ -103,6 +103,7 @@ a:hover {
 
 .btn-primary:active {
   transform: translateY(0);
+  color: white !important;
 }
 
 .btn-secondary {
@@ -340,8 +341,20 @@ select.input-field {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s ease forwards;
+}
+
+.demo-brand:hover img {
+  transform: scale(1.05);
+}
+.demo-brand:hover span {
+  color: var(--primary) !important;
 }
 
 .grid-cards {
@@ -382,3 +395,126 @@ tbody tr {
 tbody tr:hover {
   background: #F8FAFC;
 }
+
+/* Additions to index.css for Community Dashboard */
+
+.full-width {
+  margin-left: 0 !important;
+  width: 100% !important;
+  padding: 20px;
+}
+
+.back-nav-btn {
+  background: none;
+  border: none;
+  color: #2E7D32;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 1rem;
+}
+
+/* Community Dashboard Styles */
+.community-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.community-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.community-header h1 {
+  color: #2E7D32;
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.community-header.admin-header h1 {
+  color: #d32f2f;
+}
+
+.admin-badge {
+  background: #d32f2f;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 1.5rem;
+}
+
+.community-nav {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.community-nav button {
+  padding: 10px 20px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.community-nav button.active {
+  background: #2E7D32;
+  color: white;
+  border-color: #2E7D32;
+}
+
+.admin-mode .community-nav button.active {
+  background: #d32f2f;
+  border-color: #d32f2f;
+}
+
+.cv-textarea {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-family: inherit;
+  margin-bottom: 15px;
+  resize: vertical;
+}
+
+.cv-result {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border-left: 5px solid #2E7D32;
+}
+
+.good-score {
+  color: #2E7D32;
+}
+
+.bad-score {
+  color: #d32f2f;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 600px;
+}
+
+.admin-form input,
+.admin-form select,
+.admin-form textarea {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.admin-form textarea {
+  min-height: 100px;
+}
+
