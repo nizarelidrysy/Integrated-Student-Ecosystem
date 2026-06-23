@@ -1,68 +1,150 @@
-from rest_framework import viewsets, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import viewsets, status
 from rest_framework.response import Response
-from .models import Offer, Material, Message, CampusAnnouncement
-from .serializers import OfferSerializer, MaterialSerializer, MessageSerializer, CampusAnnouncementSerializer
-from .utils import analyze_cv_text
-from django.db.models import Q
+from rest_framework.decorators import action
+from .models import Post, Event, JobOffer, CVAnalysis, Message
+from .serializers import PostSerializer, EventSerializer, JobOfferSerializer, CVAnalysisSerializer, MessageSerializer
+from .ai_service import analyze_cv
+from accounts.models import CustomUser
 
-class OfferViewSet(viewsets.ModelViewSet):
-    queryset = Offer.objects.all().order_by('-date_posted')
-    serializer_class = OfferSerializer
-    
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user_id = self.request.data.get('user_id')
+        author = CustomUser.objects.filter(id=user_id).first() if user_id else None
+        serializer.save(author=author)
 
-class MaterialViewSet(viewsets.ModelViewSet):
-    queryset = Material.objects.all().order_by('-date_added')
-    serializer_class = MaterialSerializer
+    @action(detail=True, methods=['post'], url_path='toggle-validate')
+    def toggle_validate(self, request, pk=None):
+        post = self.get_object()
+        user_id = request.data.get('user_id')
+        user = CustomUser.objects.filter(id=user_id).first() if user_id else None
+        
+        if not user or user.role != 'teacher':
+            return Response({"error": "Only teachers can validate posts."}, status=status.HTTP_403_FORBIDDEN)
+            
+        if user in post.validated_by.all():
+            post.validated_by.remove(user)
+            serializer = self.get_serializer(post)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            post.validated_by.add(user)
+            serializer = self.get_serializer(post)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+class EventViewSet(viewsets.ModelViewSet):
+    queryset = Event.objects.all()
+    serializer_class = EventSerializer
+
+    def perform_create(self, serializer):
+        user_id = self.request.data.get('user_id')
+        author = CustomUser.objects.filter(id=user_id).first() if user_id else None
+        serializer.save(author=author)
+
+class JobOfferViewSet(viewsets.ModelViewSet):
+    queryset = JobOffer.objects.all()
+    serializer_class = JobOfferSerializer
+
+    def perform_create(self, serializer):
+        user_id = self.request.data.get('user_id')
+        author = CustomUser.objects.filter(id=user_id).first() if user_id else None
+        serializer.save(author=author)
+
+class CVAnalysisViewSet(viewsets.ModelViewSet):
+    queryset = CVAnalysis.objects.all()
+    serializer_class = CVAnalysisSerializer
+
+    def get_queryset(self):
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            return CVAnalysis.objects.filter(user_id=user_id)
+        return CVAnalysis.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        cv_text = request.data.get('cv_text')
+        cv_name = request.data.get('cv_name')
+        job_offer_id = request.data.get('job_offer')
+        user_id = request.data.get('user_id')
+        
+        if not cv_text:
+            return Response({"error": "cv_text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        job_offer = None
+        job_requirements = ""
+        if job_offer_id:
+            try:
+                job_offer = JobOffer.objects.get(id=job_offer_id)
+                job_requirements = job_offer.requirements
+            except JobOffer.DoesNotExist:
+                return Response({"error": "Job offer not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # If no job offer is selected, use a broad set of general requirements
+            job_requirements = (
+                "communication teamwork leadership problem solving critical thinking "
+                "project management time management adaptability creativity collaboration "
+                "python javascript java html css sql react django node.js angular vue "
+                "c++ php ruby swift kotlin typescript go rust "
+                "git github version control docker kubernetes "
+                "database postgresql mysql mongodb "
+                "machine learning data analysis artificial intelligence "
+                "web development mobile development software engineering "
+                "agile scrum rest api cloud computing aws azure "
+                "linux networking cybersecurity devops "
+                "microsoft office excel word powerpoint "
+                "photoshop figma design ui ux "
+                "english french arabic spanish german"
+            )
+
+        # Call AI service
+        score, suggestions = analyze_cv(cv_text, job_requirements)
+        
+        user = CustomUser.objects.filter(id=user_id).first() if user_id else None
+        
+        analysis = CVAnalysis.objects.create(
+            user=user,
+            job_offer=job_offer,
+            cv_name=cv_name,
+            cv_text=cv_text,
+            score=score,
+            suggestions=suggestions
+        )
+        
+        serializer = self.get_serializer(analysis)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
-    
+
     def get_queryset(self):
-        # In demo mode, return all messages
         return Message.objects.all().order_by('timestamp')
 
-    def perform_create(self, serializer):
-        # Allow passing sender_id explicitly for demo mode
-        sender_id = self.request.data.get('sender_id')
-        if sender_id:
-            serializer.save(sender_id=sender_id)
-        else:
-            # Fallback to logged-in user if exists
-            user = self.request.user if self.request.user.is_authenticated else None
-            serializer.save(sender=user)
+    @action(detail=True, methods=['post'], url_path='delete_message')
+    def delete_message(self, request, pk=None):
+        message = self.get_object()
+        user_id = request.data.get('user_id')
+        delete_type = request.data.get('type') # 'me' or 'everyone'
 
-class CampusAnnouncementViewSet(viewsets.ModelViewSet):
-    queryset = CampusAnnouncement.objects.all().order_by('-date_posted')
-    serializer_class = CampusAnnouncementSerializer
-    
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        if not user_id:
+            return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-import fitz  # PyMuPDF
-import io
-
-@api_view(['POST'])
-@permission_classes([permissions.AllowAny])  # Allowing any for demo purposes
-def cv_analyze(request):
-    text = request.data.get('text', '')
-    
-    if 'file' in request.FILES:
-        pdf_file = request.FILES['file']
-        try:
-            # Read into fitz
-            doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-            extracted_text = ""
-            for page in doc:
-                extracted_text += page.get_text("text") + "\n"
-            text = extracted_text
-        except Exception as e:
-            return Response({'error': f'Failed to parse PDF: {str(e)}'}, status=400)
-
-    if not text.strip():
-        return Response({'error': 'No text or file provided.'}, status=400)
+        if delete_type == 'everyone':
+            if message.sender.id == user_id:
+                message.deleted_for_everyone = True
+                message.save()
+                return Response({"status": "deleted for everyone"})
+            else:
+                return Response({"error": "Only the sender can delete a message for everyone."}, status=status.HTTP_403_FORBIDDEN)
         
-    result = analyze_cv_text(text)
-    return Response(result)
+        elif delete_type == 'me':
+            if message.sender.id == user_id:
+                message.deleted_by_sender = True
+            elif message.receiver.id == user_id:
+                message.deleted_by_receiver = True
+            else:
+                return Response({"error": "You are not a participant in this message."}, status=status.HTTP_403_FORBIDDEN)
+            
+            message.save()
+            return Response({"status": "deleted for me"})
+            
+        return Response({"error": "Invalid delete type"}, status=status.HTTP_400_BAD_REQUEST)

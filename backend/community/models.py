@@ -1,55 +1,84 @@
 from django.db import models
 from django.conf import settings
 
-User = settings.AUTH_USER_MODEL
+class Post(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='community_posts')
+    content = models.TextField()
+    media = models.FileField(upload_to='community/posts/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    validated_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='validated_posts', blank=True)
 
-class Offer(models.Model):
-    OFFER_TYPES = (
-        ('Internship', 'Internship'),
-        ('PFA', 'PFA'),
-        ('PFE', 'PFE'),
-    )
-    title = models.CharField(max_length=200)
-    company = models.CharField(max_length=200)
-    description = models.TextField()
-    offer_type = models.CharField(max_length=50, choices=OFFER_TYPES)
-    location = models.CharField(max_length=500, blank=True, null=True, help_text="Location text or Google Maps URL")
-    date_posted = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_offers')
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.offer_type} - {self.title}"
+        return f"Post by {self.author.username} at {self.created_at}"
 
-class Material(models.Model):
-    MATERIAL_TYPES = (
-        ('CV', 'CV Template'),
-        ('CoverLetter', 'Cover Letter Template'),
-        ('Other', 'Other'),
-    )
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True, null=True)
-    material_type = models.CharField(max_length=50, choices=MATERIAL_TYPES)
-    file_url = models.URLField(blank=True, null=True) # Assuming a simple URL for now, could be FileField if dealing with media uploads
-    date_added = models.DateTimeField(auto_now_add=True)
+class Event(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    event_date = models.DateTimeField()
+    location = models.CharField(max_length=255, blank=True, null=True)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='organized_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-event_date']
 
     def __str__(self):
         return self.title
+
+class JobOffer(models.Model):
+    JOB_TYPES = (
+        ('internship', 'Internship'),
+        ('full_time', 'Full-time'),
+        ('part_time', 'Part-time'),
+        ('freelance', 'Freelance'),
+    )
+    title = models.CharField(max_length=255)
+    company = models.CharField(max_length=255)
+    description = models.TextField()
+    requirements = models.TextField(help_text="Keywords and skills required")
+    location = models.CharField(max_length=255)
+    job_type = models.CharField(max_length=20, choices=JOB_TYPES, default='full_time')
+    expiration_date = models.DateField(blank=True, null=True)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posted_jobs')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} at {self.company}"
+
+class CVAnalysis(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cv_analyses')
+    job_offer = models.ForeignKey(JobOffer, on_delete=models.SET_NULL, null=True, blank=True)
+    cv_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the uploaded CV file")
+    cv_text = models.TextField(help_text="Extracted text from CV")
+    score = models.FloatField(help_text="Relevance score out of 100")
+    suggestions = models.TextField(help_text="Tips for optimization")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Analysis for {self.user.username} on {self.created_at}"
 
 class Message(models.Model):
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
-    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
-    content = models.TextField()
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages')
+    receiver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_messages')
+    content = models.TextField(blank=True, null=True)
+    attachment = models.FileField(upload_to='community/messages/', blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
+    deleted_by_sender = models.BooleanField(default=False)
+    deleted_by_receiver = models.BooleanField(default=False)
+    deleted_for_everyone = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['timestamp']
 
     def __str__(self):
-        return f"From {self.sender.username} to {self.receiver.username}"
-
-class CampusAnnouncement(models.Model):
-    title = models.CharField(max_length=200)
-    content = models.TextField()
-    date_posted = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_announcements')
-
-    def __str__(self):
-        return self.title
+        return f"Message from {self.sender.username} to {self.receiver.username}"

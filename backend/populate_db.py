@@ -25,13 +25,13 @@ student = CustomUser.objects.create_user(
     first_name='Nizar',
     last_name='EL IDRYSY',
     role='student',
-    matricule='S-2022-123456',
+    matricule='S-20221234',
     gender='M'
 )
 
 teacher = CustomUser.objects.create_user(
     username='teacher_hajar',
-    email='hajar.chabli@emsi.ma',
+    email='hajar.chabli@emsi-prof.ma',
     password='password123',
     first_name='Hajar',
     last_name='CHABLI',
@@ -51,11 +51,11 @@ StudentProfile.objects.create(
 )
 
 admin = CustomUser.objects.create_user(
-    username='admin_amjad',
-    email='amjad.ahrrar@emsi.ma',
-    password='password123',
-    first_name='Amjad',
-    last_name='AHRRAR',
+    username='admin_main',
+    email='admin@emsi.ma',
+    password='admin123',
+    first_name='Super',
+    last_name='Admin',
     role='admin',
     matricule='D-2018-987654',
     gender='M'
@@ -70,7 +70,7 @@ student2 = CustomUser.objects.create_user(
     first_name='Hajar',
     last_name='BENANI',
     role='student',
-    matricule='S-2023-000001',
+    matricule='S-20230000',
     gender='F'
 )
 StudentProfile.objects.create(
@@ -84,7 +84,7 @@ StudentProfile.objects.create(
 
 teacher2 = CustomUser.objects.create_user(
     username='teacher_amjad',
-    email='amjad.alami@emsi.ma',
+    email='amjad.alami@emsi-prof.ma',
     password='password123',
     first_name='Amjad',
     last_name='ALAMI',

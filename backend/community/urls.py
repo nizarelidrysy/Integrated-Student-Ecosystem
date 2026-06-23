@@ -1,14 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import OfferViewSet, MaterialViewSet, MessageViewSet, CampusAnnouncementViewSet, cv_analyze
+from .views import PostViewSet, EventViewSet, JobOfferViewSet, CVAnalysisViewSet, MessageViewSet
 
 router = DefaultRouter()
-router.register(r'offers', OfferViewSet)
-router.register(r'materials', MaterialViewSet)
+router.register(r'posts', PostViewSet)
+router.register(r'events', EventViewSet)
+router.register(r'job-offers', JobOfferViewSet)
+router.register(r'cv-analysis', CVAnalysisViewSet)
 router.register(r'messages', MessageViewSet, basename='message')
-router.register(r'announcements', CampusAnnouncementViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('cv_analyze/', cv_analyze, name='cv_analyze'),
 ]

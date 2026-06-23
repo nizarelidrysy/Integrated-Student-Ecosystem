@@ -1,44 +1,69 @@
 from rest_framework import serializers
-from .models import Offer, Material, Message, CampusAnnouncement
-from accounts.serializers import UserSerializer
+from .models import Post, Event, JobOffer, CVAnalysis, Message
+from accounts.models import CustomUser
 
-class OfferSerializer(serializers.ModelSerializer):
-    created_by = UserSerializer(read_only=True)
+class AuthorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'first_name', 'last_name', 'username', 'role', 'profile_picture']
+
+class PostSerializer(serializers.ModelSerializer):
+    author_detail = AuthorSerializer(source='author', read_only=True)
+    validators = AuthorSerializer(source='validated_by', many=True, read_only=True)
+    
+    class Meta:
+        model = Post
+        fields = ['id', 'author', 'author_detail', 'content', 'media', 'created_at', 'validators']
+        read_only_fields = ['author', 'validators']
+
+class EventSerializer(serializers.ModelSerializer):
+    author_detail = AuthorSerializer(source='author', read_only=True)
 
     class Meta:
-        model = Offer
-        fields = '__all__'
+        model = Event
+        fields = ['id', 'title', 'description', 'event_date', 'location', 'author', 'author_detail', 'created_at']
+        read_only_fields = ['author']
 
-class MaterialSerializer(serializers.ModelSerializer):
+class JobOfferSerializer(serializers.ModelSerializer):
+    author_detail = AuthorSerializer(source='author', read_only=True)
+    expiration_date = serializers.DateField(required=False, allow_null=True)
+
     class Meta:
-        model = Material
-        fields = '__all__'
+        model = JobOffer
+        fields = ['id', 'title', 'company', 'description', 'requirements', 'location', 'job_type', 'expiration_date', 'author', 'author_detail', 'created_at']
+        read_only_fields = ['author']
+
+    def validate_expiration_date(self, value):
+        if value == "" or value is None:
+            return None
+        return value
+
+class CVAnalysisSerializer(serializers.ModelSerializer):
+    user_detail = AuthorSerializer(source='user', read_only=True)
+    job_offer_detail = JobOfferSerializer(source='job_offer', read_only=True)
+
+    class Meta:
+        model = CVAnalysis
+        fields = ['id', 'user', 'user_detail', 'job_offer', 'job_offer_detail', 'cv_name', 'cv_text', 'score', 'suggestions', 'created_at']
+        read_only_fields = ['user', 'score', 'suggestions']
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender = UserSerializer(read_only=True)
+    sender = AuthorSerializer(read_only=True)
     sender_id = serializers.IntegerField(write_only=True, required=False)
     receiver_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = Message
-        fields = '__all__'
-        extra_kwargs = {'receiver': {'read_only': True}}
+        fields = ['id', 'sender', 'sender_id', 'receiver', 'receiver_id', 'content', 'attachment', 'timestamp', 'is_read', 'deleted_by_sender', 'deleted_by_receiver', 'deleted_for_everyone']
+        read_only_fields = ['receiver']
 
     def create(self, validated_data):
         receiver_id = validated_data.pop('receiver_id')
         sender_id = validated_data.pop('sender_id', None)
-        
-        # Manually create the message to ensure IDs are set correctly
         message = Message.objects.create(
             receiver_id=receiver_id,
             sender_id=sender_id,
-            content=validated_data.get('content', '')
+            content=validated_data.get('content', ''),
+            attachment=validated_data.get('attachment', None)
         )
         return message
-
-class CampusAnnouncementSerializer(serializers.ModelSerializer):
-    created_by = UserSerializer(read_only=True)
-
-    class Meta:
-        model = CampusAnnouncement
-        fields = '__all__'

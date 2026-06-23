@@ -1,66 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Check, CheckCheck } from 'lucide-react';
+import { MessageCircle, X, Send, Check, CheckCheck, Paperclip, FileText, Image as ImageIcon, Trash2, Ban, Maximize2, Minimize2, ArrowLeft } from 'lucide-react';
 import api from '../api';
 
-function ChatWidget({ demoUser, currentRole }) {
+const ChatWidget = ({ demoUser }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const messagesEndRef = useRef(null);
-
-  // Unread count per sender
+  const [attachment, setAttachment] = useState(null);
   const [seenIds, setSeenIds] = useState(new Set());
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  // Always poll for messages (even when closed) so unread badge is always visible
   useEffect(() => {
-    fetchMessages(); // initial load
-    const bgInterval = setInterval(fetchMessages, 10000); // background poll every 10s
-    return () => clearInterval(bgInterval);
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchUsers();
-      fetchMessages(); // immediate refresh on open
-      const interval = setInterval(fetchMessages, 4000); // faster poll when open
-      return () => clearInterval(interval);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    scrollToBottom();
-    // Mark visible conversation messages as read
-    if (selectedUser) {
-      const incomingIds = filteredMessages
-        .filter(m => m.sender?.id === selectedUser.id && !seenIds.has(m.id))
-        .map(m => m.id);
-      if (incomingIds.length > 0) {
-        setSeenIds(prev => {
-          const next = new Set(prev);
-          incomingIds.forEach(id => next.add(id));
-          return next;
-        });
-        // Tell backend these are read
-        incomingIds.forEach(id => {
-          api.patch(`/community/messages/${id}/`, { is_read: true }).catch(() => {});
-        });
-      }
-    }
-  }, [messages, selectedUser]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   const fetchUsers = () => {
     api.get('/accounts/users/')
       .then(res => {
-        // Only students and admins can message — no teachers
-        const allowed = res.data.filter(u =>
-          u.id !== demoUser?.id && u.role !== 'teacher'
-        );
+        const allowed = res.data.filter(u => u.id !== demoUser?.id && u.role !== 'teacher');
         setUsers(allowed);
       })
       .catch(console.error);
@@ -69,29 +35,93 @@ function ChatWidget({ demoUser, currentRole }) {
   const fetchMessages = () => {
     api.get('/community/messages/')
       .then(res => setMessages(res.data))
+      .catch(err => {
+        console.error(err);
+        if (err.response?.status === 500) {
+          alert('Database error! Please make sure you have visited /api/run-migrations/ in your browser to create the Message table.');
+        }
+      });
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    const bgInterval = setInterval(fetchMessages, 10000);
+    return () => clearInterval(bgInterval);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchUsers();
+      fetchMessages();
+      const interval = setInterval(fetchMessages, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [isOpen]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const filteredMessages = selectedUser ? messages.filter(m => {
+    const isMe = m.sender?.id === demoUser?.id;
+    if (isMe && m.deleted_by_sender) return false;
+    if (!isMe && m.deleted_by_receiver) return false;
+    return (m.sender?.id === demoUser?.id && m.receiver === selectedUser.id) ||
+           (m.sender?.id === selectedUser.id && m.receiver === demoUser?.id);
+  }) : [];
+
+  const handleDeleteMessage = (msgId, type) => {
+    api.post(`/community/messages/${msgId}/delete_message/`, { user_id: demoUser.id, type })
+      .then(() => {
+        fetchMessages();
+        setDeletingMessageId(null);
+      })
       .catch(console.error);
   };
 
+  useEffect(() => {
+    scrollToBottom();
+    if (selectedUser && isOpen) {
+      const incomingIds = filteredMessages
+        .filter(m => m.sender?.id === selectedUser.id && !seenIds.has(m.id))
+        .map(m => m.id);
+
+      if (incomingIds.length > 0) {
+        setSeenIds(prev => new Set([...prev, ...incomingIds]));
+        incomingIds.forEach(id => {
+          api.patch(`/community/messages/${id}/`, { is_read: true }).catch(() => {});
+        });
+      }
+    }
+  }, [messages, selectedUser, isOpen]);
+
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!selectedUser || !newMessage.trim() || !demoUser) return;
+    if (!selectedUser || (!newMessage.trim() && !attachment) || !demoUser) return;
 
-    api.post('/community/messages/', {
-      sender_id: demoUser.id,
-      receiver_id: selectedUser.id,
-      content: newMessage
-    }).then(() => {
+    const formData = new FormData();
+    formData.append('sender_id', demoUser.id);
+    formData.append('receiver_id', selectedUser.id);
+    if (newMessage.trim()) {
+      formData.append('content', newMessage);
+    }
+    if (attachment) {
+      formData.append('attachment', attachment);
+    }
+
+    // Since we are sending FormData, Axios will automatically set the Content-Type to multipart/form-data
+    api.post('/community/messages/', formData).then(() => {
       setNewMessage('');
+      setAttachment(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
       fetchMessages();
-    }).catch(console.error);
+    }).catch(err => {
+      console.error(err);
+      alert('Error sending message: ' + (err.response?.data?.error || err.message));
+    });
   };
 
-  const filteredMessages = selectedUser ? messages.filter(m =>
-    (m.sender?.id === demoUser?.id && m.receiver === selectedUser.id) ||
-    (m.sender?.id === selectedUser.id && m.receiver === demoUser?.id)
-  ) : [];
-
-  // Unread count per user (messages sent to me that aren't yet seen)
   const unreadCount = (userId) =>
     messages.filter(m =>
       m.sender?.id === userId &&
@@ -102,145 +132,156 @@ function ChatWidget({ demoUser, currentRole }) {
 
   const totalUnread = users.reduce((sum, u) => sum + unreadCount(u.id), 0);
 
-  const initials = (u) =>
-    `${u.first_name?.[0] || ''}${u.last_name?.[0] || ''}`.toUpperCase();
-
+  const initials = (u) => `${u.first_name?.[0] || ''}${u.last_name?.[0] || ''}`.toUpperCase();
   const avatarColor = (role) => role === 'admin' ? '#8B5CF6' : '#10B981';
 
   return (
     <>
-      {/* Floating Button with badge */}
-      <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 1000 }}>
-        {totalUnread > 0 && (
+      <button
+        className={`chat-widget-btn ${isOpen ? 'chat-open' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: 'var(--primary)',
+          color: 'white',
+          border: 'none',
+          boxShadow: '0 4px 16px rgba(16,185,129,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transform: isOpen ? 'scale(0.9)' : 'scale(1)',
+          transition: 'transform 0.2s',
+        }}
+      >
+        {isOpen ? <X size={28} /> : <MessageCircle size={28} />}
+        {!isOpen && totalUnread > 0 && (
           <div style={{
-            position: 'absolute', top: '-6px', right: '-6px',
-            background: '#EF4444', color: 'white',
-            borderRadius: '50%', width: '22px', height: '22px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.72rem', fontWeight: 700, border: '2px solid white',
+            position: 'absolute',
+            top: '-5px',
+            right: '-5px',
+            background: '#EF4444',
+            color: 'white',
+            width: '22px',
+            height: '22px',
+            borderRadius: '50%',
+            fontSize: '0.72rem',
+            fontWeight: '700',
+            border: '2px solid white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             animation: 'pulse 2s infinite',
           }}>
-            {totalUnread}
+            {totalUnread > 9 ? '9+' : totalUnread}
           </div>
         )}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          style={{
-            width: '60px', height: '60px', borderRadius: '50%',
-            background: 'var(--primary)', color: 'white', border: 'none',
-            boxShadow: '0 4px 16px rgba(16,185,129,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s',
-            transform: isOpen ? 'scale(0.9)' : 'scale(1)',
-          }}
-        >
-          {isOpen ? <X size={26} /> : <MessageCircle size={26} />}
-        </button>
-      </div>
+      </button>
 
-      {/* Chat Panel */}
       {isOpen && (
-        <div style={{
-          position: 'fixed', bottom: '5.5rem', right: '2rem',
-          width: '380px', height: '540px',
-          background: 'white', borderRadius: '18px',
+        <div className="chat-widget-window" style={{
+          width: isExpanded ? 'min(90vw, 900px)' : '380px',
+          height: isExpanded ? 'min(85vh, 700px)' : '540px',
+          maxHeight: 'calc(100vh - 120px)',
+          background: 'white',
+          borderRadius: '18px',
+          border: '1px solid #e2e8f0',
           boxShadow: '0 16px 48px rgba(0,0,0,0.15)',
-          zIndex: 999, display: 'flex', flexDirection: 'column',
-          overflow: 'hidden', border: '1px solid #e2e8f0',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
           animation: 'fadeIn 0.2s ease forwards',
         }}>
-
-          {/* Header */}
           <div style={{
             background: 'linear-gradient(135deg, #10B981, #059669)',
-            color: 'white', padding: '1rem 1.25rem',
-            display: 'flex', alignItems: 'center', gap: '0.6rem',
-            flexShrink: 0,
+            padding: '1rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            color: 'white',
+            flexShrink: 0
           }}>
-            <MessageCircle size={20} />
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Community Chat</span>
+            {(!isExpanded || isMobile) && selectedUser ? (
+              <button onClick={() => setSelectedUser(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
+                <ArrowLeft size={20} />
+              </button>
+            ) : (
+              <MessageCircle size={20} />
+            )}
+            <span style={{ fontWeight: '700' }}>Community Chat</span>
             {selectedUser && (
-              <span style={{ marginLeft: 'auto', fontSize: '0.8rem', opacity: 0.85 }}>
+              <span style={{ marginLeft: 'auto', marginRight: '0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>
                 {selectedUser.first_name} {selectedUser.last_name}
               </span>
             )}
+            <div style={{ marginLeft: !selectedUser ? 'auto' : '0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {!isMobile && (
+                <button className="chat-mobile-close" onClick={() => setIsExpanded(!isExpanded)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+              )}
+              <button className="chat-mobile-close" onClick={() => setIsOpen(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-
-            {/* Contacts list */}
             <div style={{
-              width: selectedUser ? '70px' : '100%',
-              borderRight: selectedUser ? '1px solid #e2e8f0' : 'none',
+              width: selectedUser ? (isMobile ? '0px' : (isExpanded ? '70px' : '0px')) : '100%',
               background: '#f8fafc',
+              borderRight: (selectedUser && !isExpanded && !isMobile) ? 'none' : '1px solid #e2e8f0',
               overflowY: 'auto',
+              overflowX: 'hidden',
               transition: 'width 0.25s ease',
-              flexShrink: 0,
+              flexShrink: 0
             }}>
-              {selectedUser && (
-                <div
-                  onClick={() => setSelectedUser(null)}
-                  style={{
-                    padding: '0.75rem 0', textAlign: 'center', cursor: 'pointer',
-                    borderBottom: '1px solid #e2e8f0', fontSize: '0.8rem',
-                    color: '#10B981', fontWeight: 700,
-                  }}
-                >
-                  ←
-                </div>
-              )}
               {users.map(u => {
-                const uc = unreadCount(u.id);
+                const unread = unreadCount(u.id);
                 return (
                   <div
                     key={u.id}
                     onClick={() => setSelectedUser(u)}
                     style={{
-                      padding: selectedUser ? '0.75rem 0' : '0.9rem 1rem',
-                      borderBottom: '1px solid #e2e8f0', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center',
-                      gap: selectedUser ? 0 : '0.75rem',
-                      justifyContent: selectedUser ? 'center' : 'flex-start',
-                      background: selectedUser?.id === u.id
-                        ? 'rgba(16,185,129,0.1)' : 'transparent',
-                      position: 'relative', transition: 'background 0.15s',
+                      padding: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      borderBottom: '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      background: selectedUser?.id === u.id ? 'rgba(16,185,129,0.1)' : 'transparent',
+                      transition: 'background 0.15s',
                     }}
                   >
-                    {/* Avatar */}
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{ position: 'relative' }}>
                       <div style={{
-                        width: '38px', height: '38px', borderRadius: '50%',
-                        background: avatarColor(u.role),
-                        color: 'white', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem',
+                        width: '40px', height: '40px', borderRadius: '50%',
+                        background: avatarColor(u.role), color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: '600', fontSize: '0.9rem'
                       }}>
                         {initials(u)}
                       </div>
-                      {uc > 0 && (
+                      {unread > 0 && (
                         <div style={{
-                          position: 'absolute', top: '-4px', right: '-4px',
-                          background: '#EF4444', color: 'white', borderRadius: '50%',
-                          width: '18px', height: '18px', fontSize: '0.65rem',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 700, border: '1.5px solid white',
+                          position: 'absolute', top: '-2px', right: '-2px',
+                          background: '#EF4444', color: 'white', width: '16px', height: '16px',
+                          borderRadius: '50%', fontSize: '0.6rem', fontWeight: '700',
+                          border: '2px solid white', display: 'flex', alignItems: 'center',
+                          justifyContent: 'center'
                         }}>
-                          {uc}
+                          {unread}
                         </div>
                       )}
                     </div>
                     {!selectedUser && (
-                      <div style={{ overflow: 'hidden', flex: 1 }}>
-                        <div style={{
-                          fontWeight: uc > 0 ? 700 : 600,
-                          whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden',
-                          fontSize: '0.9rem',
-                        }}>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                           {u.first_name} {u.last_name}
                         </div>
-                        <div style={{
-                          fontSize: '0.73rem', color: '#64748b',
-                          textTransform: 'capitalize',
-                        }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                           {u.role}
                         </div>
                       </div>
@@ -248,99 +289,217 @@ function ChatWidget({ demoUser, currentRole }) {
                   </div>
                 );
               })}
-              {users.length === 0 && !selectedUser && (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                  No contacts available
-                </div>
-              )}
             </div>
 
-            {/* Chat Area */}
-            {selectedUser && (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'white', overflow: 'hidden' }}>
-                {/* Messages */}
-                <div style={{
-                  flex: 1, overflowY: 'auto', padding: '1rem 0.875rem',
-                  display: 'flex', flexDirection: 'column', gap: '0.4rem',
-                }}>
-                  {filteredMessages.map(m => {
-                    const isMe = m.sender?.id === demoUser?.id;
-                    const isRead = m.is_read || seenIds.has(m.id);
-                    return (
-                      <div key={m.id} style={{
-                        alignSelf: isMe ? 'flex-end' : 'flex-start',
-                        maxWidth: '82%',
-                      }}>
-                        <div style={{
-                          background: isMe ? 'linear-gradient(135deg, #10B981, #059669)' : '#f1f5f9',
-                          color: isMe ? 'white' : '#1e293b',
-                          padding: '0.55rem 0.85rem',
-                          borderRadius: '14px',
-                          borderBottomRightRadius: isMe ? '3px' : '14px',
-                          borderBottomLeftRadius: isMe ? '14px' : '3px',
-                          fontSize: '0.88rem', lineHeight: 1.45,
+            {selectedUser ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'white' }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {filteredMessages.length === 0 ? (
+                    <div style={{ margin: 'auto', color: '#94a3b8', fontSize: '0.83rem', textAlign: 'center', lineHeight: '1.6' }}>
+                      No messages yet.<br/>Say hi to {selectedUser.first_name}!
+                    </div>
+                  ) : (
+                    filteredMessages.map(m => {
+                      const isMe = m.sender?.id === demoUser?.id;
+                      const isRead = m.is_read || seenIds.has(m.id);
+                      return (
+                        <div key={m.id} style={{
+                          alignSelf: isMe ? 'flex-end' : 'flex-start',
+                          maxWidth: '82%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                          position: 'relative'
                         }}>
-                          {m.content}
-                        </div>
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: '0.25rem',
-                          justifyContent: isMe ? 'flex-end' : 'flex-start',
-                          marginTop: '2px', paddingLeft: isMe ? 0 : '4px',
-                          paddingRight: isMe ? '4px' : 0,
-                        }}>
-                          <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                            {m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </span>
-                          {isMe && (
-                            isRead
-                              ? <CheckCheck size={13} color="#10B981" />
-                              : <Check size={13} color="#94a3b8" />
+                          <div style={{
+                            background: m.deleted_for_everyone ? 'transparent' : (isMe ? 'linear-gradient(135deg, #10B981, #059669)' : '#f1f5f9'),
+                            color: m.deleted_for_everyone ? '#94a3b8' : (isMe ? 'white' : '#1e293b'),
+                            padding: '0.55rem 0.85rem',
+                            borderRadius: '14px',
+                            borderBottomRightRadius: isMe ? '3px' : '14px',
+                            borderBottomLeftRadius: isMe ? '14px' : '3px',
+                            border: m.deleted_for_everyone ? '1px dashed #cbd5e1' : 'none',
+                            fontSize: '0.88rem',
+                            lineHeight: '1.45',
+                            wordBreak: 'break-word',
+                            fontStyle: m.deleted_for_everyone ? 'italic' : 'normal'
+                          }}>
+                            {m.deleted_for_everyone ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Ban size={14} />
+                                <span>This message was deleted</span>
+                              </div>
+                            ) : (
+                              <>
+                                {m.attachment && (
+                                  <div style={{ marginBottom: m.content ? '0.5rem' : '0' }}>
+                                    {m.attachment.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                                      <a href={m.attachment} target="_blank" rel="noopener noreferrer">
+                                        <img src={m.attachment} alt="attachment" style={{ maxWidth: '100%', borderRadius: '8px', maxHeight: '150px', objectFit: 'cover' }} />
+                                      </a>
+                                    ) : (
+                                      <a href={m.attachment} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'inherit', textDecoration: 'none', background: 'rgba(0,0,0,0.05)', padding: '6px 10px', borderRadius: '8px', maxWidth: '100%' }}>
+                                        <FileText size={16} style={{ flexShrink: 0 }} />
+                                        <span style={{ fontSize: '0.8rem', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {decodeURIComponent(m.attachment.split('/').pop().split('?')[0])}
+                                        </span>
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                                {m.content && <div>{m.content}</div>}
+                              </>
+                            )}
+                          </div>
+                          <div style={{
+                            fontSize: '0.68rem',
+                            color: '#94a3b8',
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {isMe && (
+                              isRead ? <CheckCheck size={13} color="#10B981" /> : <Check size={13} color="#94a3b8" />
+                            )}
+                            <button 
+                              onClick={() => setDeletingMessageId(deletingMessageId === m.id ? null : m.id)}
+                              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', marginLeft: '4px', padding: 0, display: 'flex', alignItems: 'center' }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+
+                          {deletingMessageId === m.id && (
+                            <div style={{
+                              position: 'absolute',
+                              background: 'white',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              padding: '4px',
+                              zIndex: 10,
+                              top: '100%',
+                              marginTop: '4px',
+                              right: isMe ? '0' : 'auto',
+                              left: isMe ? 'auto' : '0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px',
+                              minWidth: '130px'
+                            }}>
+                              <button onClick={() => handleDeleteMessage(m.id, 'me')} style={{ textAlign: 'left', padding: '8px 10px', background: 'none', border: 'none', fontSize: '0.75rem', cursor: 'pointer', borderRadius: '4px', color: '#1e293b' }} onMouseEnter={e => e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background='none'}>
+                                Delete for me
+                              </button>
+                              {isMe && (
+                                <button onClick={() => handleDeleteMessage(m.id, 'everyone')} style={{ textAlign: 'left', padding: '8px 10px', background: 'none', border: 'none', fontSize: '0.75rem', cursor: 'pointer', borderRadius: '4px', color: '#ef4444' }} onMouseEnter={e => e.currentTarget.style.background='#fee2e2'} onMouseLeave={e => e.currentTarget.style.background='none'}>
+                                  Delete for everyone
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
-                  {filteredMessages.length === 0 && (
-                    <div style={{
-                      margin: 'auto', color: '#94a3b8',
-                      fontSize: '0.83rem', textAlign: 'center', lineHeight: 1.6,
-                    }}>
-                      No messages yet.<br />
-                      Say hi to {selectedUser.first_name}! 👋
-                    </div>
+                      );
+                    })
                   )}
                   <div ref={messagesEndRef} />
                 </div>
-
-                {/* Input */}
-                <form onSubmit={handleSendMessage} style={{
-                  padding: '0.75rem', borderTop: '1px solid #e2e8f0',
-                  display: 'flex', gap: '0.5rem', flexShrink: 0,
-                }}>
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={e => setNewMessage(e.target.value)}
-                    placeholder={`Message ${selectedUser.first_name}...`}
-                    style={{
-                      flex: 1, padding: '0.5rem 0.875rem', borderRadius: '20px',
-                      border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.88rem',
-                      transition: 'border-color 0.2s',
-                    }}
-                    onFocus={e => e.target.style.borderColor = '#10B981'}
-                    onBlur={e => e.target.style.borderColor = '#e2e8f0'}
-                  />
-                  <button type="submit" disabled={!newMessage.trim()} style={{
-                    background: newMessage.trim() ? 'linear-gradient(135deg, #10B981, #059669)' : '#e2e8f0',
-                    color: 'white', border: 'none', borderRadius: '50%',
-                    width: '38px', height: '38px', flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: newMessage.trim() ? 'pointer' : 'not-allowed',
-                    transition: 'background 0.2s, transform 0.15s',
+                <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #e2e8f0', background: 'white', flexShrink: 0 }}>
+                  {attachment && (
+                    <div style={{ padding: '0.4rem 0.75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                      <Paperclip size={14} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</span>
+                      <button type="button" onClick={() => setAttachment(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  <form onSubmit={handleSendMessage} style={{
+                    padding: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    gap: '0.5rem'
                   }}>
-                    <Send size={16} />
-                  </button>
-                </form>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      style={{ display: 'none' }}
+                      onChange={e => setAttachment(e.target.files[0])}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.4rem', borderRadius: '50%', transition: 'background 0.2s', marginBottom: '4px'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <Paperclip size={18} />
+                    </button>
+                    <textarea
+                      ref={textareaRef}
+                      value={newMessage}
+                      onChange={e => {
+                        setNewMessage(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = (e.target.scrollHeight) + 'px';
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
+                      }}
+                      placeholder={`Message ${selectedUser.first_name}...`}
+                      rows={1}
+                      style={{
+                        flex: 1,
+                        padding: '0.55rem 0.875rem',
+                        borderRadius: '16px',
+                        border: '1.5px solid #e2e8f0',
+                        fontSize: '0.88rem',
+                        outline: 'none',
+                        resize: 'none',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.4',
+                        maxHeight: '120px',
+                        overflowY: 'auto',
+                        minHeight: '38px',
+                        transition: 'border-color 0.2s',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#10B981'}
+                      onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newMessage.trim() && !attachment}
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '50%',
+                        background: (newMessage.trim() || attachment) ? 'linear-gradient(135deg, #10B981, #059669)' : '#e2e8f0',
+                        color: 'white',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: (newMessage.trim() || attachment) ? 'pointer' : 'not-allowed',
+                        transition: 'background 0.2s, transform 0.15s',
+                        flexShrink: 0,
+                        marginBottom: '4px'
+                      }}
+                    >
+                      <Send size={16} style={{ marginLeft: '-2px', marginTop: '2px' }} />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+                Select a contact to chat
               </div>
             )}
           </div>
@@ -348,6 +507,6 @@ function ChatWidget({ demoUser, currentRole }) {
       )}
     </>
   );
-}
+};
 
 export default ChatWidget;

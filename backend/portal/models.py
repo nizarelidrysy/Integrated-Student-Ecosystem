@@ -10,6 +10,8 @@ class CalendarEvent(models.Model):
     end_time = models.DateTimeField()
     event_type = models.CharField(max_length=100)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_events')
+    professor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_events', limit_choices_to={'role': 'teacher'})
+    target_classes = models.CharField(max_length=200, blank=True, null=True, default='All Classes', help_text="Comma separated list of classes, e.g. '1A_IIR, 2A_IIR' or 'All Classes'")
 
     def __str__(self):
         return self.title
@@ -78,3 +80,10 @@ class DocumentRequest(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.document_type} ({self.status})"
+
+class ClassSchedule(models.Model):
+    target_class = models.CharField(max_length=50, unique=True)
+    schedule_data = models.JSONField(default=list)
+
+    def __str__(self):
+        return f"Schedule for {self.target_class}"

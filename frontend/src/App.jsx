@@ -1,131 +1,136 @@
 import React, { useState, useEffect } from 'react';
+import { Moon, Sun } from 'lucide-react';
+import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import StudentDashboard from './pages/StudentDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import AdminDashboard from './pages/AdminDashboard';
-import LandingPage from './pages/LandingPage';
-import PlatformSelection from './pages/PlatformSelection';
-import EmsiSharePlaceholder from './pages/EmsiSharePlaceholder';
-import CommunityStudentDashboard from './pages/CommunityStudentDashboard';
-import CommunityAdminDashboard from './pages/CommunityAdminDashboard';
+import CommunityDashboard from './pages/CommunityDashboard';
+import ShareDashboard from './pages/ShareDashboard';
+import Login from './pages/Login';
 import ChatWidget from './components/ChatWidget';
-import api from './api';
 
 function App() {
-  const [currentRole, setCurrentRole] = useState(null);
-  const [currentPlatform, setCurrentPlatform] = useState(null);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [currentPlatform, setCurrentPlatform] = useState('portal');
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [demoData, setDemoData] = useState(null);
-  const [landingKey, setLandingKey] = useState(0);
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'light';
+  });
+  const [isAnimatingTheme, setIsAnimatingTheme] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Fetch initial demo data to verify connection
-    api.get('/accounts/users/demo_users/')
-      .then(res => {
-        setDemoData(res.data);
-      })
-      .catch(err => console.error("Error fetching demo users", err));
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
-  const handleBackToRoleSelection = () => {
-    setCurrentRole(null);
-    setCurrentPlatform(null);
-    setLandingKey(k => k + 1); // remount to retrigger landing animations
+  const toggleTheme = () => {
+    setIsAnimatingTheme(true);
+    setTheme(theme === 'light' ? 'dark' : 'light');
+    setTimeout(() => setIsAnimatingTheme(false), 500);
   };
 
-  const handleBackToPlatformSelection = () => {
-    setCurrentPlatform(null);
+  const handleLogin = (userData) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    window.location.reload();
   };
 
-  // When entering community, start on profile
-  const handleSetPlatform = (platform) => {
-    if (platform === 'community') setActiveTab('profile');
-    else setActiveTab('dashboard');
-    setCurrentPlatform(platform);
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    window.location.reload();
   };
 
-  // If no role is selected, show Landing Page
-  if (!currentRole) {
-    return <div key={landingKey} className="animate-fade-in"><LandingPage onSelectRole={setCurrentRole} /></div>;
+  if (!user) {
+    return (
+      <div className="app-container" style={{ paddingTop: 0 }}>
+        <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 100 }}>
+          <button 
+            onClick={toggleTheme} 
+            className="role-btn theme-btn" 
+            style={{ padding: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer' }}
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            <div className={isAnimatingTheme ? 'spin-animation' : ''} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px' }}>
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </div>
+          </button>
+        </div>
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+          <Login onLogin={handleLogin} />
+        </div>
+      </div>
+    );
   }
 
-  // If role is selected but platform is not, show Platform Selection
-  if (!currentPlatform) {
-    return <PlatformSelection 
-      currentRole={currentRole} 
-      onSelectPlatform={handleSetPlatform} 
-      onBack={handleBackToRoleSelection}
-    />;
-  }
-
-  // Render content based on platform and role
-  const renderPlatformContent = () => {
-    if (currentPlatform === 'portal') {
-      switch (currentRole) {
-        case 'student':
-          return <StudentDashboard activeTab={activeTab} demoUser={demoData?.student} />;
-        case 'teacher':
-          return <TeacherDashboard activeTab={activeTab} demoUser={demoData?.teacher} />;
-        case 'admin':
-          return <AdminDashboard activeTab={activeTab} demoUser={demoData?.admin} />;
-        default:
-          return <div>Invalid Role</div>;
-      }
-    } 
-    
+  const renderContent = () => {
     if (currentPlatform === 'community') {
-      if (currentRole === 'teacher') {
-        return <div>Access Denied. Teachers cannot access the community.</div>;
-      }
-      if (currentRole === 'admin') {
-        return <CommunityAdminDashboard demoUser={demoData?.admin} activeTab={activeTab} />;
-      }
-      return <CommunityStudentDashboard demoUser={demoData?.student} activeTab={activeTab} />;
+      return <CommunityDashboard activeTab={activeTab} demoUser={user} />;
     }
-
     if (currentPlatform === 'share') {
-      return <EmsiSharePlaceholder />;
+      return <ShareDashboard activeTab={activeTab} demoUser={user} />;
     }
-
-    return <div>Invalid Platform</div>;
+    
+    switch (user.role) {
+      case 'student':
+        return <StudentDashboard activeTab={activeTab} demoUser={user} />;
+      case 'teacher':
+        return <TeacherDashboard activeTab={activeTab} demoUser={user} />;
+      case 'admin':
+        return <AdminDashboard activeTab={activeTab} demoUser={user} />;
+      default:
+        return <div>Select a role</div>;
+    }
   };
 
   return (
     <div className="app-container">
-      <div className="demo-topbar">
-        <div
-          className="demo-brand"
-          style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}}
-          onClick={handleBackToRoleSelection}
-          title="Return to login screen"
-        >
-          <img src="/src/assets/logo.png" alt="EMSIGHT" style={{height: '55px', transition: 'transform 0.2s'}} />
-          <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-            <span style={{fontWeight: 800, fontSize: '1.4rem', lineHeight: '1.2', color: '#1a1a1a'}}>EMSIGHT</span>
-            <span style={{fontWeight: 600, fontSize: '0.85rem', color: '#6b7280', letterSpacing: '0.5px'}}>
-              {currentPlatform === 'community' ? 'COMMUNITY' : 'STUDENT PORTAL'}
-            </span>
-          </div>
-        </div>
-      </div>
+      <TopBar 
+        user={user} 
+        onLogout={handleLogout}
+        theme={theme} 
+        setTheme={setTheme}
+        currentPlatform={currentPlatform}
+        setCurrentPlatform={(platform) => {
+          setCurrentPlatform(platform);
+          if (platform === 'community') {
+            setActiveTab('feed');
+          } else if (platform === 'share') {
+            setActiveTab('browse');
+          } else {
+            setActiveTab('dashboard');
+          }
+        }}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
+      
+      <div 
+        className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+      ></div>
 
-      {(currentPlatform === 'portal' || currentPlatform === 'community') && (
-        <Sidebar currentRole={currentRole} currentPlatform={currentPlatform} activeTab={activeTab} setActiveTab={setActiveTab} />
-      )}
+      <Sidebar 
+        user={user} 
+        currentRole={user.role} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab}
+        currentPlatform={currentPlatform}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
       
-      {currentPlatform !== 'role_select' && (
-        <div className="main-content">
-          <button className="back-nav-btn" onClick={handleBackToPlatformSelection}>
-            &larr; Switch Platform
-          </button>
-          <div className="animate-fade-in" key={`${currentRole}-${currentPlatform}-${activeTab}`}>
-            {renderPlatformContent()}
-          </div>
+      <main className="main-content">
+        <div className="animate-fade-in" key={`${user.role}-${activeTab}-${currentPlatform}`}>
+          {renderContent()}
         </div>
-      )}
-      
+      </main>
+
       {currentPlatform === 'community' && (
-        <ChatWidget demoUser={currentRole === 'admin' ? demoData?.admin : demoData?.student} />
+        <ChatWidget demoUser={user} />
       )}
     </div>
   );

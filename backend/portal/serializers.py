@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from .models import CalendarEvent, Notification, ReportCard, Grade, Absence, DocumentRequest
+from .models import CalendarEvent, Notification, ReportCard, Grade, Absence, DocumentRequest, ClassSchedule
 from accounts.serializers import UserSerializer
 
 class CalendarEventSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
+    professor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CalendarEvent
@@ -11,6 +12,11 @@ class CalendarEventSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+        
+    def get_professor_name(self, obj):
+        if obj.professor:
+            return f"{obj.professor.first_name} {obj.professor.last_name}"
+        return None
 
 class NotificationSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
@@ -51,4 +57,9 @@ class DocumentRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DocumentRequest
+        fields = '__all__'
+
+class ClassScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClassSchedule
         fields = '__all__'

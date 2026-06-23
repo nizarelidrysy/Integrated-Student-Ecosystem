@@ -9,7 +9,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 class TeacherProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeacherProfile
-        fields = ['departement', 'matiere']
+        fields = ['departement', 'matiere', 'classes']
 
 class AdminProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -23,4 +23,4 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'matricule', 'gender', 'student_profile', 'teacher_profile', 'admin_profile']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'matricule', 'gender', 'profile_picture', 'student_profile', 'teacher_profile', 'admin_profile']
